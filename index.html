@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orlando - IA para Maestros</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
+  <!-- PDF & DOCX libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen">
+      <div class="login-card">
+        <div class="logo">
+          <div class="logo-icon">🎓</div>
+          <h1>Orlando</h1>
+          <p>IA inteligente para maestros</p>
+        </div>
+        <div id="login-form">
+          <input type="email" id="email" placeholder="Correo electrónico" autocomplete="email" />
+          <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password" />
+          <button id="btn-login" class="btn primary">Iniciar sesión</button>
+          <button id="btn-register" class="btn secondary">Crear cuenta</button>
+          <p id="login-error" class="error"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Home Screen: Lista de Colegios -->
+    <div id="home-screen" class="screen hidden">
+      <header class="top-bar">
+        <div class="brand">
+          <span class="logo-small">🎓</span>
+          <h2>Orlando</h2>
+        </div>
+        <div class="user-info">
+          <span id="user-email"></span>
+          <button id="btn-logout" class="btn-icon" title="Cerrar sesión">⏻</button>
+        </div>
+      </header>
+
+      <main class="home-main">
+        <div class="home-header">
+          <h1>Mis Colegios</h1>
+          <p>Cada colegio tiene su propio historial e información aislada</p>
+        </div>
+
+        <div class="schools-grid" id="schools-grid">
+          <!-- Cards de colegios se insertan aquí -->
+        </div>
+
+        <button id="btn-add-school" class="add-school-btn">
+          <span class="plus">+</span>
+          <span>Agregar colegio</span>
+        </button>
+      </main>
+    </div>
+
+    <!-- Modal Agregar Colegio -->
+    <div id="modal-add-school" class="modal hidden">
+      <div class="modal-content">
+        <h3>Agregar nuevo colegio</h3>
+        <input type="text" id="school-name-input" placeholder="Nombre del colegio (ej: Escuela Epifanio)" maxlength="80" />
+        <div class="modal-actions">
+          <button id="btn-cancel-school" class="btn secondary">Cancelar</button>
+          <button id="btn-save-school" class="btn primary">Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat Screen (por colegio) -->
+    <div id="chat-screen" class="screen hidden">
+      <header class="chat-header">
+        <button id="btn-back" class="btn-icon">←</button>
+        <div class="chat-title">
+          <h2 id="current-school-name">Colegio</h2>
+          <span class="subtitle">Orlando • Solo este colegio</span>
+        </div>
+        <div class="chat-actions">
+          <button id="btn-generate-exam" class="btn small" title="Generar examen">📝 Examen</button>
+          <button id="btn-clear-chat" class="btn-icon" title="Limpiar chat">🗑️</button>
+        </div>
+      </header>
+
+      <div class="chat-container">
+        <div id="chat-messages" class="messages"></div>
+        <div class="typing-indicator hidden" id="typing">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+
+      <div class="chat-input-area">
+        <div class="quick-actions">
+          <button class="quick-btn" data-prompt="Resume las asistencias de esta semana">📅 Asistencias</button>
+          <button class="quick-btn" data-prompt="Calcula el promedio de notas de todos los estudiantes">📊 Promedios</button>
+          <button class="quick-btn" data-prompt="Genera un ejercicio de verdadero o falso de matemáticas para 5to grado">✏️ Ejercicio</button>
+          <button class="quick-btn" data-prompt="¿Por qué sacó baja calificación un estudiante? Explica con detalle">❓ Explicar nota</button>
+        </div>
+        <div class="input-row">
+          <textarea id="chat-input" placeholder="Escribe aquí... Ej: Marta vino hoy, entregó ciencias (3pts) pero no matemáticas (6pts). Mateo faltó sin justificativo." rows="1"></textarea>
+          <button id="btn-send" class="btn-send">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Generar Examen / Tarea -->
+    <div id="modal-generate" class="modal hidden">
+      <div class="modal-content wide">
+        <h3>Generar material</h3>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="gen-type">
+            <option value="examen">Examen</option>
+            <option value="tarea">Tarea / Ejercicio</option>
+            <option value="verdadero-falso">Verdadero / Falso</option>
+            <option value="opcion-multiple">Opción múltiple</option>
+            <option value="completar">Completar espacios</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Materia / Tema</label>
+          <input type="text" id="gen-subject" placeholder="Ej: Matemáticas - Fracciones" />
+        </div>
+        <div class="form-group">
+          <label>Grado / Nivel</label>
+          <input type="text" id="gen-grade" placeholder="Ej: 5to básico" />
+        </div>
+        <div class="form-group">
+          <label>Cantidad de preguntas / ejercicios</label>
+          <input type="number" id="gen-count" value="10" min="3" max="30" />
+        </div>
+        <div class="form-group">
+          <label>Instrucciones adicionales (opcional)</label>
+          <textarea id="gen-extra" rows="2" placeholder="Incluir respuestas, dificultad media..."></textarea>
+        </div>
+        <div class="modal-actions">
+          <button id="btn-cancel-gen" class="btn secondary">Cancelar</button>
+          <button id="btn-do-generate" class="btn primary">Generar con Orlando</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Resultado Generado (con export) -->
+    <div id="modal-result" class="modal hidden">
+      <div class="modal-content wide">
+        <h3 id="result-title">Material generado</h3>
+        <div id="result-content" class="result-box"></div>
+        <div class="export-buttons">
+          <button id="btn-export-pdf" class="btn primary">📄 PDF</button>
+          <button id="btn-export-word" class="btn primary">📝 Word</button>
+          <button id="btn-export-image" class="btn secondary">🖼️ Imagen</button>
+          <button id="btn-copy-text" class="btn secondary">📋 Copiar texto</button>
+        </div>
+        <button id="btn-close-result" class="btn secondary full">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/gemini.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

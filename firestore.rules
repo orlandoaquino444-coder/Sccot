@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Colegios: solo el dueño puede leer/escribir
+    match /schools/{schoolId} {
+      allow read, update, delete: if request.auth != null 
+        && request.auth.uid == resource.data.ownerId;
+      
+      allow create: if request.auth != null 
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.keys().hasAll(['name', 'ownerId', 'createdAt']);
+      
+      // Mensajes del chat de ese colegio
+      match /messages/{messageId} {
+        allow read, write: if request.auth != null 
+          && get(/databases/$(database)/documents/schools/$(schoolId)).data.ownerId == request.auth.uid;
+      }
+      
+      // Estudiantes (preparado para futuras mejoras)
+      match /students/{studentId} {
+        allow read, write: if request.auth != null 
+          && get(/databases/$(database)/documents/schools/$(schoolId)).data.ownerId == request.auth.uid;
+      }
+    }
+  }
+}
